@@ -11,11 +11,20 @@ import (
 	"strings"
 )
 
+type Page struct {
+	Name string `json:"page"`
+}
+
+// Words This is setup to hit the '/words' endpoint
 type Words struct {
 	//These need to be exported because the json parse method here needs it.
-	Page  string   `json:"page"`
 	Input string   `json:"input"`
 	Words []string `json:"words"`
+}
+
+// Occurrence This is setup to hit the '/occurrence' endpoint
+type Occurrence struct {
+	Words map[string]int `json:"words"`
 }
 
 func RollHTTPGet() {
@@ -56,12 +65,37 @@ func RollHTTPGet() {
 		os.Exit(1)
 	}
 
-	var words Words
+	var page Page
 
-	err = json.Unmarshal(body, &words)
+	err = json.Unmarshal(body, &page)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("JSON parsed\nPage: %s\nWords: %v\n", words.Page, strings.Join(words.Words, ", "))
+	switch page.Name {
+	case "words":
+		var words Words
+		err = json.Unmarshal(body, &words)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("JSON: Parsed\nPage: %s\nWords: %v\n", page.Name, strings.Join(words.Words, ", "))
+	case "occurrence":
+		var occurrence Occurrence
+		err = json.Unmarshal(body, &occurrence)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if val, ok := occurrence.Words["word3"]; ok {
+			fmt.Printf("Found word1: %d\n", val)
+		}
+
+		for word, occ := range occurrence.Words {
+			fmt.Printf("%s: %d\n", word, occ)
+		}
+	default:
+		fmt.Printf("Page not found\n")
+	}
+
 }
