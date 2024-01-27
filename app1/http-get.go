@@ -1,13 +1,22 @@
 package app1
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
+
+type Words struct {
+	//These need to be exported because the json parse method here needs it.
+	Page  string   `json:"page"`
+	Input string   `json:"input"`
+	Words []string `json:"words"`
+}
 
 func RollHTTPGet() {
 	args := os.Args
@@ -42,6 +51,17 @@ func RollHTTPGet() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("HTTP Status Code: %d\nBody: %s\n", resp.StatusCode, body)
+	if resp.StatusCode != 200 {
+		fmt.Printf("HTTP Status Code: %d\nBody: %s\n", resp.StatusCode, body)
+		os.Exit(1)
+	}
 
+	var words Words
+
+	err = json.Unmarshal(body, &words)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("JSON parsed\nPage: %s\nWords: %v\n", words.Page, strings.Join(words.Words, ", "))
 }
