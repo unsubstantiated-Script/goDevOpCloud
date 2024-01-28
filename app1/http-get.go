@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,9 +21,31 @@ type Words struct {
 	Words []string `json:"words"`
 }
 
+// GetResponse method bound to above struct. Helps with our Response interface below
+func (w Words) GetResponse() string {
+	return fmt.Sprintf("%s", strings.Join(w.Words, ", "))
+}
+
 // Occurrence This is setup to hit the '/occurrence' endpoint
 type Occurrence struct {
 	Words map[string]int `json:"words"`
+}
+
+// GetResponse method bound to above struct. Helps with our Response interface below
+func (o Occurrence) GetResponse() string {
+	//Transforming map into a slice
+	var out []string
+
+	for word, occur := range o.Words {
+		out = append(out, fmt.Sprintf("%s (%d)", word, occur))
+	}
+
+	return fmt.Sprintf("%s", strings.Join(out, ", "))
+}
+
+// Response This interface helps Words and Occurrence process through w/o hassle between types. Represents an intersection.
+type Response interface {
+	GetResponse() string
 }
 
 func RollHTTPGet() {
@@ -35,41 +56,51 @@ func RollHTTPGet() {
 		os.Exit(1)
 	}
 
-	//Declaring and checking at the same time.
-	if _, err := url.ParseRequestURI(args[1]); err != nil {
-		fmt.Printf("URL is in invalid format: %s\n", err)
+	res, err := doRequest(args[1])
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
+	}
+
+	if res == nil {
+		fmt.Printf("No response \n")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Response: %s\n", res.GetResponse())
+}
+
+func doRequest(requestURL string) (Response, error) {
+	//Declaring and checking at the same time.
+	if _, err := url.ParseRequestURI(requestURL); err != nil {
+		return nil, fmt.Errorf("validation error: URL is not valid %s", err)
 	}
 
 	////Need to declare here else, the inline below only has acces to the var inside of that if scope.
 	//var resp *http.Response
 
-	resp, err := http.Get(args[1])
+	resp, err := http.Get(requestURL)
 
 	if err != nil {
-		log.Fatal(err)
-		//We don't need these below as they're not user errors
-		//fmt.Printf("URL is in invalid format: %s\n", err)
-		//os.Exit(1)
+		return nil, fmt.Errorf("HTTP Get error: %s", err)
 	}
 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("ReadAll error: %s", err)
 	}
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("HTTP Status Code: %d\nBody: %s\n", resp.StatusCode, body)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid output (HTTP Code %d): %s\n", resp.StatusCode, string(body))
 	}
 
 	var page Page
 
 	err = json.Unmarshal(body, &page)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("unmarshal error: %s", err)
 	}
 
 	switch page.Name {
@@ -77,25 +108,19 @@ func RollHTTPGet() {
 		var words Words
 		err = json.Unmarshal(body, &words)
 		if err != nil {
-			log.Fatal(err)
+			return nil, fmt.Errorf("unmarshal error: %s", err)
 		}
-		fmt.Printf("JSON: Parsed\nPage: %s\nWords: %v\n", page.Name, strings.Join(words.Words, ", "))
+		return words, nil
 	case "occurrence":
 		var occurrence Occurrence
 		err = json.Unmarshal(body, &occurrence)
 		if err != nil {
-			log.Fatal(err)
+			return nil, fmt.Errorf("unmarshal error: %s", err)
 		}
 
-		if val, ok := occurrence.Words["word3"]; ok {
-			fmt.Printf("Found word1: %d\n", val)
-		}
-
-		for word, occ := range occurrence.Words {
-			fmt.Printf("%s: %d\n", word, occ)
-		}
-	default:
-		fmt.Printf("Page not found\n")
+		return occurrence, nil
 	}
+
+	return nil, nil
 
 }
