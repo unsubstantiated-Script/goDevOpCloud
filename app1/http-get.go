@@ -2,6 +2,7 @@ package app1
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"goDevOpCloud/utils"
 	"io"
@@ -50,14 +51,34 @@ type Response interface {
 }
 
 func RollHTTPGet() {
-	args := os.Args
+	//args := os.Args
+	//
+	//if len(args) < 2 {
+	//	fmt.Printf("Useage: ./http-get <url>\n")
+	//	os.Exit(1)
+	//}
 
-	if len(args) < 2 {
-		fmt.Printf("Useage: ./http-get <url>\n")
+	var (
+		requestURL string
+		password   string
+		parsedURL  *url.URL
+		err        error
+	)
+
+	//Using flags to access CLI commands or endpoints
+	flag.StringVar(&requestURL, "url", "", "url to access")
+	flag.StringVar(&password, "password", "", "use a password to access API")
+
+	flag.Parse()
+
+	//Declaring and checking at the same time.
+	if parsedURL, err = url.ParseRequestURI(requestURL); err != nil {
+		fmt.Printf("Validation error: URL is not valid %s\n", err)
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	res, err := doRequest(args[1])
+	res, err := doRequest(parsedURL.String())
 	if err != nil {
 		if requestErr, ok := err.(utils.RequestError); ok {
 			fmt.Printf("Error: %s (HTTP Code: %d, Body: %s)\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
@@ -76,10 +97,6 @@ func RollHTTPGet() {
 }
 
 func doRequest(requestURL string) (Response, error) {
-	//Declaring and checking at the same time.
-	if _, err := url.ParseRequestURI(requestURL); err != nil {
-		return nil, fmt.Errorf("validation error: URL is not valid %s", err)
-	}
 
 	////Need to declare here else, the inline below only has acces to the var inside of that if scope.
 	//var resp *http.Response
