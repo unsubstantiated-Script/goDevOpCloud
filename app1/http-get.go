@@ -78,7 +78,21 @@ func RollHTTPGet() {
 		os.Exit(1)
 	}
 
-	res, err := doRequest(parsedURL.String())
+	client := http.Client{}
+
+	if password != "" {
+		token, err := doLoginRequest(client, parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
+		if requestErr, ok := err.(utils.RequestError); ok {
+			fmt.Printf("Error: %s (HTTP Code: %d, Body: %s)\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+			os.Exit(1)
+		}
+		client.Transport = MyJWTTransport{
+			transport: http.DefaultTransport,
+			token:     token,
+		}
+	}
+
+	res, err := doRequest(client, parsedURL.String())
 	if err != nil {
 		if requestErr, ok := err.(utils.RequestError); ok {
 			fmt.Printf("Error: %s (HTTP Code: %d, Body: %s)\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
@@ -96,12 +110,12 @@ func RollHTTPGet() {
 	fmt.Printf("Response: %s\n", res.GetResponse())
 }
 
-func doRequest(requestURL string) (Response, error) {
+func doRequest(client http.Client, requestURL string) (Response, error) {
 
 	////Need to declare here else, the inline below only has acces to the var inside of that if scope.
 	//var resp *http.Response
 
-	resp, err := http.Get(requestURL)
+	resp, err := client.Get(requestURL)
 
 	if err != nil {
 		return nil, fmt.Errorf("HTTP Get error: %s", err)
@@ -110,6 +124,7 @@ func doRequest(requestURL string) (Response, error) {
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
+
 	if err != nil {
 		return nil, fmt.Errorf("ReadAll error: %s", err)
 	}
