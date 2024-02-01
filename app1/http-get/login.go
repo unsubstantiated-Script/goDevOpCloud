@@ -1,4 +1,4 @@
-package app1
+package http_get
 
 import (
 	"bytes"
