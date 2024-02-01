@@ -1,14 +1,10 @@
-package app1
+package http_get
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"goDevOpCloud/utils"
 	"io"
-	"net/http"
-	"net/url"
-	"os"
 	"strings"
 )
 
@@ -28,6 +24,11 @@ func (w Words) GetResponse() string {
 	return fmt.Sprintf("%s", strings.Join(w.Words, ", "))
 }
 
+// Response This interface helps Words and Occurrence process through w/o hassle between types. Represents an intersection.
+type Response interface {
+	GetResponse() string
+}
+
 // Occurrence This is setup to hit the '/occurrence' endpoint
 type Occurrence struct {
 	Words map[string]int `json:"words"`
@@ -45,77 +46,13 @@ func (o Occurrence) GetResponse() string {
 	return fmt.Sprintf("%s", strings.Join(out, ", "))
 }
 
-// Response This interface helps Words and Occurrence process through w/o hassle between types. Represents an intersection.
-type Response interface {
-	GetResponse() string
-}
-
-func RollHTTPGet() {
-	//args := os.Args
-	//
-	//if len(args) < 2 {
-	//	fmt.Printf("Useage: ./http-get <url>\n")
-	//	os.Exit(1)
-	//}
-
-	var (
-		requestURL string
-		password   string
-		parsedURL  *url.URL
-		err        error
-	)
-
-	//Using flags to access CLI commands or endpoints
-	flag.StringVar(&requestURL, "url", "", "url to access")
-	flag.StringVar(&password, "password", "", "use a password to access API")
-
-	flag.Parse()
-
-	//Declaring and checking at the same time.
-	if parsedURL, err = url.ParseRequestURI(requestURL); err != nil {
-		fmt.Printf("Validation error: URL is not valid %s\n", err)
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	client := http.Client{}
-
-	if password != "" {
-		token, err := doLoginRequest(client, parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
-		if requestErr, ok := err.(utils.RequestError); ok {
-			fmt.Printf("Error: %s (HTTP Code: %d, Body: %s)\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
-			os.Exit(1)
-		}
-		client.Transport = MyJWTTransport{
-			transport: http.DefaultTransport,
-			token:     token,
-		}
-	}
-
-	res, err := doRequest(client, parsedURL.String())
-	if err != nil {
-		if requestErr, ok := err.(utils.RequestError); ok {
-			fmt.Printf("Error: %s (HTTP Code: %d, Body: %s)\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
-			os.Exit(1)
-		}
-		fmt.Printf("Error: %s\n", err)
-		os.Exit(1)
-	}
-
-	if res == nil {
-		fmt.Printf("No response \n")
-		os.Exit(1)
-	}
-
-	fmt.Printf("Response: %s\n", res.GetResponse())
-}
-
-func doRequest(client http.Client, requestURL string) (Response, error) {
+// DoGetRequest This API struct is in the init.go file
+func (a API) DoGetRequest(requestURL string) (Response, error) {
 
 	////Need to declare here else, the inline below only has acces to the var inside of that if scope.
 	//var resp *http.Response
 
-	resp, err := client.Get(requestURL)
+	resp, err := a.Client.Get(requestURL)
 
 	if err != nil {
 		return nil, fmt.Errorf("HTTP Get error: %s", err)
